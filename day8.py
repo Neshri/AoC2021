@@ -4,8 +4,9 @@ Created on Wed Dec  8 16:10:49 2021
 
 @author: AntonLundgren
 """
-DIGITS = {0: "abcefg", 1: "cf", 2: "acdeg", 3: "acdfg", 4: "bcdf", 5: "abdf", 6: "abdefg", 7: "acf", 8: "abcdefg", 9: "abcdfg"}
-LENGTH_DICT = {2:1, 4:4, 3:7, 7:8}
+DIGITS = {0: "abcefg", 1: "cf", 2: "acdeg", 3: "acdfg", 4: "bcdf",
+          5: "abdf", 6: "abdefg", 7: "acf", 8: "abcdefg", 9: "abcdfg"}
+LENGTH_DICT = {2: 1, 4: 4, 3: 7, 7: 8}
 with open("day8input.txt") as f:
     lines = [x.strip().split(' ') for x in f.readlines()]
 [x.remove('|') for x in lines]
@@ -25,7 +26,7 @@ count = 0
 for x in lines:
     string_to_number = dict()
     number_to_string = dict()
-    tmp = [[], []]
+    nonunique = [[], []]
     for y in range(10):
         if len(x[y]) in (2, 4, 3, 7):
             # Decode 1 4 7 8
@@ -33,37 +34,39 @@ for x in lines:
             number_to_string.update({LENGTH_DICT[len(x[y])]: x[y]})
         elif len(x[y]) == 6:
             # save 0 6 9
-            tmp[0].append(x[y])
+            nonunique[0].append(x[y])
         else:
             # save 2 3 5
-            tmp[1].append(x[y])
-    
+            nonunique[1].append(x[y])
+
     # Decode 6 9 0
-    for y in tmp[0]:
-        if not set(number_to_string[1]).issubset(y):
-            string_to_number.update({y: 6})
-            number_to_string.update({6: y})
-        elif set(number_to_string[4]).issubset(y):
-            string_to_number.update({y: 9})
-            number_to_string.update({9: y})
+    for i in nonunique[0]:
+        if not set(number_to_string[1]).issubset(i):
+            string_to_number.update({i: 6})
+            number_to_string.update({6: i})
+        elif set(number_to_string[4]).issubset(i):
+            string_to_number.update({i: 9})
+            number_to_string.update({9: i})
         else:
-            string_to_number.update({y: 0})
-            number_to_string.update({0: y})
-    
+            string_to_number.update({i: 0})
+            number_to_string.update({0: i})
+
     # Decode 3 5 2
-    for y in tmp[1]:
-        if set(number_to_string[1]).issubset(y):
-            string_to_number.update({y: 3})
-            number_to_string.update({3: y})
-        elif set(y).issubset(number_to_string[6]):
-            string_to_number.update({y: 5})
-            number_to_string.update({5: y})
+    for i in nonunique[1]:
+        if set(number_to_string[1]).issubset(i):
+            string_to_number.update({i: 3})
+            number_to_string.update({3: i})
+        elif set(i).issubset(number_to_string[6]):
+            string_to_number.update({i: 5})
+            number_to_string.update({5: i})
         else:
-            string_to_number.update({y: 2})
-            number_to_string.update({2: y})
-    output = []    
+            string_to_number.update({i: 2})
+            number_to_string.update({2: i})
+    
+    # Add output to counter
+    output = ""
     for y in range(10, 14):
-        output.append(string_to_number[x[y]])
-    count += int("".join(map(str, output)))
+        output += str(string_to_number[x[y]])
+    count += int(output)
 
 print("The second answer is:", count)
