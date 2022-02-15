@@ -2,6 +2,8 @@ import numpy as np
 import time
 t = time.perf_counter()
 
+# calculate the binary value of 3*3 square using the default for out of bounds values
+# could optimize by checking if x, y is missing entry but is inside the boundary then 0
 def box_binary(y, x, image, default):
     send = 0
     for y_i in range(y-1, y+2):
@@ -15,14 +17,15 @@ def box_binary(y, x, image, default):
     send >>= 1
     return send
 
+# Enhance image once with out of bounds set to the default value
 def enhance(in_image, filter, default):
     y_range = [0, 0]
     x_range = [0, 0]
     for key in in_image.keys():
-        y_range[0] = key[0] if key[0] < y_range[0] else y_range[0]
-        y_range[1] = key[0] if key[0] > y_range[1] else y_range[1]
-        x_range[0] = key[1] if key[1] < x_range[0] else x_range[0]
-        x_range[1] = key[1] if key[1] > x_range[1] else x_range[1]
+        y_range[0] = min(key[0], y_range[0])
+        y_range[1] = max(key[0], y_range[1])
+        x_range[0] = min(key[1], x_range[0])
+        x_range[1] = max(key[1], x_range[1])
     binary_board = dict()
     for y_i in range(y_range[0], y_range[1]+1):
         for x_i in range(x_range[0], x_range[1]+1):
@@ -81,10 +84,10 @@ for i in range(2):
 y_range = [0, 0]
 x_range = [0, 0]
 for key in board.keys():
-    y_range[0] = key[0] if key[0] < y_range[0] else y_range[0]
-    y_range[1] = key[0] if key[0] > y_range[1] else y_range[1]
-    x_range[0] = key[1] if key[1] < x_range[0] else x_range[0]
-    x_range[1] = key[1] if key[1] > x_range[1] else x_range[1]
+    y_range[0] = min(key[0], y_range[0])
+    y_range[1] = max(key[0], y_range[1])
+    x_range[0] = min(key[1], x_range[0])
+    x_range[1] = max(key[1], x_range[1])
 enhanced_image = np.full(shape=(x_range[1] - x_range[0], y_range[1] - y_range[0]), fill_value='#')
 for key in board.keys():
     enhanced_image[key[1], key[0]] = '.' if board[key] == 0 else '#'
@@ -105,10 +108,10 @@ for i in range(48):
 y_range = [0, 0]
 x_range = [0, 0]
 for key in board.keys():
-    y_range[0] = key[0] if key[0] < y_range[0] else y_range[0]
-    y_range[1] = key[0] if key[0] > y_range[1] else y_range[1]
-    x_range[0] = key[1] if key[1] < x_range[0] else x_range[0]
-    x_range[1] = key[1] if key[1] > x_range[1] else x_range[1]
+    y_range[0] = min(key[0], y_range[0])
+    y_range[1] = max(key[0], y_range[1])
+    x_range[0] = min(key[1], x_range[0])
+    x_range[1] = max(key[1], x_range[1])
 enhanced_image = np.full(shape=(x_range[1] - x_range[0], y_range[1] - y_range[0]), fill_value='#')
 for key in board.keys():
     enhanced_image[key[1], key[0]] = '.' if board[key] == 0 else '#'
