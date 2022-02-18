@@ -34,10 +34,9 @@ def enhance(in_image, filter, default):
     has_changed = True
     while has_changed:
         has_changed = False
-        y_range[0] -= 1
-        y_range[1] += 1
-        x_range[0] -= 1
-        x_range[1] += 1
+        tmp = np.array([-1, 1])
+        y_range = y_range + tmp
+        x_range = x_range + tmp
         repeating_value = box_binary(y_range[0], x_range[0], in_image, default)
         for x_i in range(x_range[0], x_range[1]+1):
             tmp = box_binary(y_range[0], x_i, in_image, default)
