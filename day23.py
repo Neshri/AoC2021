@@ -76,6 +76,8 @@ def find_cheapest(from_board, to_board):
         state_hash = board_hash(state)
         if state_hash in processed or state_hash == FINISHED_HASH:
             continue
+
+        has_moved = False
         for old_point in HALLWAY:
             if state[old_point] in AMPHIPOD_TYPES:
                 for new_point in AMPHIPOD_DESTINATIONS[state[old_point]]:
@@ -84,8 +86,12 @@ def find_cheapest(from_board, to_board):
                     moveable, cost = move(old_point[0], old_point[1], new_point[0], new_point[1], state)
                     if moveable:
                         update_queue(queue, state_costs, state, state_hash, old_point, new_point, cost)
+                        has_moved = True
                         break
-        
+            if has_moved:
+                break
+        if has_moved:
+            continue
         for old_point in ROOMS:
             if state[old_point] in AMPHIPOD_TYPES:
                 if old_point in AMPHIPOD_DESTINATIONS[state[old_point]]:
@@ -98,7 +104,6 @@ def find_cheapest(from_board, to_board):
                             break
                     if not incorrect_occupants:
                         continue
-                has_moved = False
                 for new_point in AMPHIPOD_DESTINATIONS[state[old_point]]:
                     if old_point == new_point:
                         continue
@@ -114,6 +119,8 @@ def find_cheapest(from_board, to_board):
                         moveable, cost = move(old_point[0], old_point[1], new_point[0], new_point[1], state)
                         if moveable:
                             update_queue(queue, state_costs, state, state_hash, old_point, new_point, cost)
+                else:
+                    break
         processed.add(state_hash)
     # Calculate cheap path
     cheapest = 2 ** 63
@@ -137,8 +144,9 @@ def update_queue(queue, state_costs, state, state_hash, old_point, new_point, co
     new_hash = board_hash(new_state)
     if new_hash not in state_costs.keys():
         state_costs[new_hash] = set()
-    state_costs[new_hash].add((cost, state_hash))
-    queue.append(new_state)
+    if (cost, state_hash) not in state_costs[new_hash]:
+        state_costs[new_hash].add((cost, state_hash))
+        queue.append(new_state)
 
 
 with open("day23input.txt") as f:
