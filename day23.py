@@ -1,9 +1,9 @@
 import numpy as np
 from collections import deque
+import time
+t = time.perf_counter()
 AMPHIPOD_DESTINATIONS = {'A': 3, 'B': 5, 'C': 7, 'D': 9}
 AMPHIPOD_TYPES = set(['A', 'B', 'C', 'D'])
-HALLWAY = (1, 2, 4, 6, 8, 10, 11)
-ROOMS = (3, 5, 7, 9)
 AMPHIPOD_COSTS = {'A': 1, 'B': 10, 'C': 100, 'D': 1000}
 
 
@@ -12,53 +12,40 @@ AMPHIPOD_COSTS = {'A': 1, 'B': 10, 'C': 100, 'D': 1000}
 def move(old_y, old_x, new_y, new_x, board):
     cost = 0
     letter = board[old_y][old_x]
-    if board[new_y][new_x] != '.':
-        return False, cost
-    if new_x == AMPHIPOD_DESTINATIONS[letter] and new_y == 2 and board[3][new_x] != letter:
-        return False, cost
-    if old_x == AMPHIPOD_DESTINATIONS[letter]:
-        return False, cost
+    # Trying to move non-amphipod
     if letter not in AMPHIPOD_TYPES:
         return False, cost
-    
+    # Destination occupied?
+    if board[new_y][new_x] != '.':
+        return False, cost
+    # Room has incorrect occupant?
+    if new_x == AMPHIPOD_DESTINATIONS[letter]:
+        tmp = set(('.', 'x', '#', letter))
+        for y_i in range(len(board)):
+            if board[y_i][new_x] not in tmp:
+                return False, cost
+    # Start moving
     pos = [old_y, old_x]
     while pos[0] != new_y or pos[1] != new_x:
         if pos[1] == new_x:
-            if board[pos[0] + 1][pos[1]] == '.' or board[pos[0] + 1][pos[1]] == 'x':
+            y_dir = 1 if pos[0] < new_y else -1
+            if board[pos[0] + y_dir][pos[1]] == '.' or board[pos[0] + y_dir][pos[1]] == 'x':
                 pos[0] += 1
                 cost += 1
             else:
                 return False, cost
         else:
-            x_dir = (new_x - old_x) // abs(new_x - old_x)
+            x_dir = 1 if pos[1] < new_x else -1
             if board[pos[0]][pos[1] + x_dir] == '.' or board[pos[0]][pos[1] + x_dir] == 'x':
                 pos[1] += x_dir
                 cost += 1
             elif board[pos[0] - 1][pos[1]] == '.' or board[pos[0] - 1][pos[1]] == 'x':
-                pos[0] += -1
+                pos[0] -= 1
                 cost += 1
             else:
                 return False, cost
     return True, cost * AMPHIPOD_COSTS[letter]
 
-
-
-
-def board_copy(board):
-    copy = list()
-    for y in board:
-        tmp = list()
-        for x in y:
-            tmp.append(x)
-        copy.append(tmp)
-    return np.array(copy)
-
-def equal_matrix(a, b):
-    for y in range(len(a)):
-        for x in range(len(a[y])):
-            if a[y][x] != b[y][x]:
-                return False
-    return True
 
 def board_hash(a):
     h = 0
@@ -66,15 +53,8 @@ def board_hash(a):
         h += hash(tuple(a[y])) * y
     return h
 
-def print_board(a):
-    for y in a:
-        print(y)
-
-
-
 
 def find_cheapest(from_board, to_board):
-
     HALLWAY = list()
     ROOMS = list()
     AMPHIPOD_DESTINATIONS = {'A': list(), 'B': list(), 'C': list(), 'D': list()}
@@ -94,31 +74,79 @@ def find_cheapest(from_board, to_board):
     while len(queue) > 0:
         state = queue.pop()
         state_hash = board_hash(state)
-        if state_hash in processed:
+        if state_hash in processed or state_hash == FINISHED_HASH:
             continue
-        for h_point in HALLWAY:
-            if state[h_point] in AMPHIPOD_TYPES:
-                for dest in AMPHIPOD_DESTINATIONS[state[h_point]]:
-                    if state[dest] != state[h_point] and state[dest] != '.':
+
+        has_moved = False
+        for old_point in HALLWAY:
+            if state[old_point] in AMPHIPOD_TYPES:
+                for new_point in AMPHIPOD_DESTINATIONS[state[old_point]]:
+                    if state[new_point] != state[old_point] and state[new_point] != '.':
                         break
-                    moveable, cost = move(h_point[0], h_point[1], dest[0], dest[1], state)
+                    moveable, cost = move(old_point[0], old_point[1], new_point[0], new_point[1], state)
                     if moveable:
-                        new_state = np.array(state, copy=True)
-                        new_state[h_point] = '.'
-                        new_state[dest] = state[h_point]
-                        new_hash = board_hash(new_state)
-                        if new_hash not in state_costs.keys():
-                            state_costs[new_hash] = list()
-                        state_costs[new_hash].append(cost, state_hash)
-                        queue.append(new_state)
-        
-        for r_point in ROOMS:
-            if state[r_point] in AMPHIPOD_TYPES:
-
-                pass
-
+                        update_queue(queue, state_costs, state, state_hash, old_point, new_point, cost)
+                        has_moved = True
+                        break
+            if has_moved:
+                break
+        if has_moved:
+            continue
+        for old_point in ROOMS:
+            if state[old_point] in AMPHIPOD_TYPES:
+                if old_point in AMPHIPOD_DESTINATIONS[state[old_point]]:
+                    incorrect_occupants = False
+                    for p in AMPHIPOD_DESTINATIONS[state[old_point]]:
+                        if p == old_point:
+                            break
+                        if state[p] != state[old_point]:
+                            incorrect_occupants = True
+                            break
+                    if not incorrect_occupants:
+                        continue
+                for new_point in AMPHIPOD_DESTINATIONS[state[old_point]]:
+                    if old_point == new_point:
+                        continue
+                    if state[new_point] != state[old_point] and state[new_point] != '.':
+                        break
+                    moveable, cost = move(old_point[0], old_point[1], new_point[0], new_point[1], state)
+                    if moveable:
+                        update_queue(queue, state_costs, state, state_hash, old_point, new_point, cost)
+                        has_moved = True
+                        break
+                if not has_moved:
+                    for new_point in HALLWAY:
+                        moveable, cost = move(old_point[0], old_point[1], new_point[0], new_point[1], state)
+                        if moveable:
+                            update_queue(queue, state_costs, state, state_hash, old_point, new_point, cost)
+                else:
+                    break
         processed.add(state_hash)
-    return 0
+    # Calculate cheap path
+    cheapest = 2 ** 63
+    queue = deque()
+    queue.append((0, FINISHED_HASH))
+    first_hash = board_hash(from_board)
+    while len(queue) > 0:
+        cost, current_hash = queue.pop()
+        if current_hash == first_hash:
+            if cost < cheapest:
+                cheapest = cost
+        else:
+            for a in state_costs[current_hash]:
+                queue.append((cost + a[0], a[1]))
+    return cheapest
+
+def update_queue(queue, state_costs, state, state_hash, old_point, new_point, cost):
+    new_state = np.array(state, copy=True)
+    new_state[old_point] = '.'
+    new_state[new_point] = state[old_point]
+    new_hash = board_hash(new_state)
+    if new_hash not in state_costs.keys():
+        state_costs[new_hash] = set()
+    if (cost, state_hash) not in state_costs[new_hash]:
+        state_costs[new_hash].add((cost, state_hash))
+        queue.append(new_state)
 
 
 with open("day23input.txt") as f:
@@ -127,120 +155,30 @@ for b in board:
     for i in range(len(board[0]) - len(b)):
         b.append(' ')
 board = np.array(board)
-for r in ROOMS:
+rooms = (3, 5, 7, 9)
+for r in rooms:
     board[1, r] = 'x'
-cheapest_cost = 2 ** 63
 
-FINISHED_BOARD = np.array(board, copy=True)
-FINISHED_BOARD[2][3] = FINISHED_BOARD[3][3] = 'A'
-FINISHED_BOARD[2][5] = FINISHED_BOARD[3][5] = 'B'
-FINISHED_BOARD[2][7] = FINISHED_BOARD[3][7] = 'C'
-FINISHED_BOARD[2][9] = FINISHED_BOARD[3][9] = 'D'
+finished_board = np.array(board, copy=True)
+for y_i in range(2, 4):
+    finished_board[y_i][3] = 'A'
+    finished_board[y_i][5] = 'B'
+    finished_board[y_i][7] = 'C'
+    finished_board[y_i][9] = 'D'
 
-ans = find_cheapest(board, FINISHED_BOARD)
-print(ans)
-# queue.append((board, 0))
-# def move_hallway(AMPHIPOD_DESTINATIONS, AMPHIPOD_TYPES, HALLWAY, move, board_copy, queue, state):
-#     for x in HALLWAY:
-#         l = state[0][1][x]
-#         old_pos = (1, x)
-#         if l in AMPHIPOD_TYPES:
-#             new_pos = (3, AMPHIPOD_DESTINATIONS[l])
-#             moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#             if moveable:
-#                 # cost = 2 + abs(x - AMPHIPOD_DESTINATIONS[l])
-#                 c = board_copy(state[0])
-#                 c[old_pos[0]][old_pos[1]] = '.'
-#                 c[new_pos[0]][new_pos[1]] = l
-#                 queue.append((c, state[1] + cost))
-#                 return True
-#             new_pos = (2, AMPHIPOD_DESTINATIONS[l])
-#             moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#             if moveable:
-#                 c = board_copy(state[0])
-#                 c[old_pos[0]][old_pos[1]] = '.'
-#                 c[new_pos[0]][new_pos[1]] = l
-#                 queue.append((c, state[1] + cost))
-#                 return True
-#     return False
+ans = find_cheapest(board, finished_board)
+print("The first answer is:", ans)
 
-# def move_rooms(AMPHIPOD_DESTINATIONS, AMPHIPOD_TYPES, HALLWAY, ROOMS, move, board_copy, queue, state):
-#     for x in ROOMS:
-#         l = state[0][2][x]
-#         old_pos = (2, x)
-#         if l in AMPHIPOD_TYPES:
-#             new_pos = (3, AMPHIPOD_DESTINATIONS[l])
-#             moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#             if moveable:
-#                 c = board_copy(state[0])
-#                 c[old_pos[0]][old_pos[1]] = '.'
-#                 c[new_pos[0]][new_pos[1]] = l
-#                 queue.append((c, state[1] + cost))
-#                 return True
-#             new_pos = (2, AMPHIPOD_DESTINATIONS[l])
-#             moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#             if moveable:
-#                 c = board_copy(state[0])
-#                 c[old_pos[0]][old_pos[1]] = '.'
-#                 c[new_pos[0]][new_pos[1]] = l
-#                 queue.append((c, state[1] + cost))
-#                 return True
-#             for x_i in HALLWAY:
-#                 new_pos = (1, x_i)
-#                 moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#                 if moveable:
-#                     c = board_copy(state[0])
-#                     c[old_pos[0]][old_pos[1]] = '.'
-#                     c[new_pos[0]][new_pos[1]] = l
-#                     queue.append((c, state[1] + cost))
-#         l = state[0][3][x]
-#         old_pos = (3, x)
-#         if l in AMPHIPOD_TYPES:
-#             new_pos = (3, AMPHIPOD_DESTINATIONS[l])
-#             moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#             if moveable:
-#                 c = board_copy(state[0])
-#                 c[old_pos[0]][old_pos[1]] = '.'
-#                 c[new_pos[0]][new_pos[1]] = l
-#                 queue.append((c, state[1] + cost))
-#                 return True
-#             new_pos = (2, AMPHIPOD_DESTINATIONS[l])
-#             moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#             if moveable:
-#                 c = board_copy(state[0])
-#                 c[old_pos[0]][old_pos[1]] = '.'
-#                 c[new_pos[0]][new_pos[1]] = l
-#                 queue.append((c, state[1] + cost))
-#                 return True
-#             for x_i in HALLWAY:
-#                 new_pos = (1, x_i)
-#                 moveable, cost = move(old_pos[0], old_pos[1], new_pos[0], new_pos[1], state[0])
-#                 if moveable:
-#                     c = board_copy(state[0])
-#                     c[old_pos[0]][old_pos[1]] = '.'
-#                     c[new_pos[0]][new_pos[1]] = l
-#                     queue.append((c, state[1] + cost))
-#     return False
-# processed = dict()
-# while len(queue) > 0:
-#     state = queue.pop()
-#     hash_state = board_hash(state[0])
-#     if hash_state in processed:
-#         if state[1] < processed[hash_state]:
-#             processed[hash_state] = state[1]
-#         continue
-#     if equal_matrix(state[0], FINISHED_BOARD):
-#         print(len(queue), cheapest_cost)
-#         # print_board(state[0])
-#         if state[1] < cheapest_cost:
-#             cheapest_cost = state[1]
-#             continue
-#     # Check Hallway
-#     if not move_hallway(AMPHIPOD_DESTINATIONS, AMPHIPOD_TYPES, HALLWAY, move, board_copy, queue, state):
-#         # Check Rooms
-#         move_rooms(AMPHIPOD_DESTINATIONS, AMPHIPOD_TYPES, HALLWAY, ROOMS, move, board_copy, queue, state)
-#         # print_board(state[0])
-#     processed[hash_state] = state[1]
-# h = board_hash(FINISHED_BOARD)
-# print(processed[h])
-# print("The first answer is:", cheapest_cost)
+print("The execution time was:", int((time.perf_counter() - t) * 1000), "ms")
+
+board = np.insert(board, 3, list("  #D#B#A#C#  "), axis=0)
+board = np.insert(board, 3, list("  #D#C#B#A#  "), axis=0)
+finished_board = np.array(board, copy=True)
+for y_i in range(2, 6):
+    finished_board[y_i][3] = 'A'
+    finished_board[y_i][5] = 'B'
+    finished_board[y_i][7] = 'C'
+    finished_board[y_i][9] = 'D'
+
+print("The second answer is:", find_cheapest(board, finished_board))
+print("The total execution time was:", int((time.perf_counter() - t) * 1000), "ms")
